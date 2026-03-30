@@ -8,9 +8,9 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from src.generator import BaseGenerator, LMStudioGenerator, OpenAIGenerator, SYSTEM_PROMPT
-from src.utils import chunk_text
-from src.checker import check_answer
+from grcs.generator import BaseGenerator, LMStudioGenerator, OpenAIGenerator, SYSTEM_PROMPT
+from grcs.utils import chunk_text
+from grcs.checker import check_answer
 
 # Configure logging
 logging.basicConfig(
@@ -18,33 +18,35 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stdout,
 )
-logger = logging.getLogger("ceps.engine")
+logger = logging.getLogger("grcs.engine")
 
 
-class CEPSEngine:
-    def __init__(self, patch_path: str, model_name: Optional[str] = None):
-        """
-        Initializes the CEPS Engine by loading a patch and an embedding model.
-        """
-        self.patch_path = Path(patch_path)
-        if not self.patch_path.exists():
-            raise FileNotFoundError(f"Patch not found at {patch_path}")
+class GRCSEngine:
+    """
+    Initializes the GRCS Engine by loading a map and an embedding model.
+    """
 
-        with open(self.patch_path, "r", encoding="utf-8") as f:
-            self.patch = json.load(f)
+    def __init__(self, map_path: str, model_name: Optional[str] = None):
+        self.map_path = Path(map_path)
+        if not self.map_path.exists():
+            raise FileNotFoundError(f"Map not found at {map_path}")
 
-        self.ceps_version = self.patch["metadata"]["ceps_version"]
-        self.model_name = model_name or self.patch["metadata"]["model_name"]
-        self.alpha = self.patch["config"]["alpha"]
-        self.anchor = check_answer(self.patch["anchor"]["completion"])
+        with open(self.map_path, "r", encoding="utf-8") as f:
+            self.map_data = json.load(f)
 
-        logger.info(f"[*] Initializing CEPS v{self.ceps_version} Engine")
+        self.grcs_version = self.map_data["metadata"]["grcs_version"]
+        self.model_name = model_name or self.map_data["metadata"]["model_name"]
+        self.alpha = self.map_data["metadata"].get("alpha", 0.1)
+        self.expected_type = self.map_data["metadata"].get("expected_type", "html")
+        self.anchor = check_answer(self.map_data["anchor"]["completion"])
+
+        logger.info(f"[*] Initializing GRCS v{self.grcs_version} Engine")
         logger.info(f"[*] Loading embedding model: {self.model_name}")
         self.embedder = SentenceTransformer(self.model_name)
 
         # Load centroids as numpy arrays
-        self.pos_centroids = np.array(self.patch["essay"]["pos_centroids"])
-        self.neg_centroids = np.array(self.patch["essay"]["neg_centroids"])
+        self.pos_centroids = np.array(self.map_data["pos_centroids"])
+        self.neg_centroids = np.array(self.map_data["neg_centroids"])
 
     def get_steered_prompt(self) -> str:
         """
@@ -158,18 +160,19 @@ class CEPSEngine:
         }
 
 
+
 def run_engine_inference(
-    patch_path: str,
-    prompt: str,
-    k: int = 3,
-    alpha: Optional[float] = None,
-    backend: str = "lmstudio",
-    model: str = "local-model",
-    base_url: str = "http://localhost:1234/v1",
-    workers: int = 5,
-    expected_type: str = "html",
+    map_path,
+    prompt,
+    k=3,
+    alpha=None,
+    backend="lmstudio",
+    model="local-model",
+    base_url="http://localhost:1234/v1",
+    workers=4,
+    expected_type="html",
 ):
-    engine = CEPSEngine(patch_path=patch_path)
+    engine = GRCSEngine(map_path=map_path)
     result = engine.run_steered_inference(
         prompt=prompt,
         generator_backend=backend,
@@ -181,7 +184,7 @@ def run_engine_inference(
     )
     
     print("\n" + "="*50)
-    print("CEPS STEERED INFERENCE RESULT")
+    print("GRCS STEERED INFERENCE RESULT")
     print("="*50)
     print(f"PROMPT: {prompt[:100]}...")
     print(f"BEST SCORE: {result['all_scores'][result['best_idx']]:.4f}")

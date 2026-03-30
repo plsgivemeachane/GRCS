@@ -1,6 +1,6 @@
 This is a solid, modular plan. Since we are targeting **UI Experts** first, the "Judgment" phase is crucial because you need to *see* the rendered HTML/CSS to decide if it's "Expert" or "Substandard."
 
-Here is the architectural blueprint for **CEPS v1.0**.
+Here is the architectural blueprint for **GRCS v1.0**.
 
 ---
 
@@ -8,12 +8,14 @@ Here is the architectural blueprint for **CEPS v1.0**.
 ```text
 ./
 ├── data/               # Raw and labeled JSONL files
-├── patches/            # Compiled .ceps files (Vector Essays + Anchors)
-├── src/
+├── maps/               # Compiled .grcs files (Vector Essays + Anchors)
+├── grcs/
 │   ├── generator.py    # Batch generation logic (OpenAI/vLLM/Local)
 │   ├── judge_ui.py     # Simple local web-server to view and P/N label UI
 │   ├── builder.py      # Embedding, Clustering, and Anchor selection
-│   └── engine.py       # The inference wrapper (The "Patch" runner)
+│   ├── engine.py       # The inference wrapper (The "Patch" runner)
+│   ├── checker.py      # Content cleaning and validation
+│   └── utils.py        # Shared utilities
 └── main.py             # CLI entry point
 ```
 
@@ -69,8 +71,8 @@ print(similarities)
     *   The goal isn't just to group them, but to find the **Medoid** (the actual sample closest to the cluster center).
     *   **The Anchor:** The sample closest to the center of the largest/highest-quality cluster becomes the **Static Anchor** used in the prompt instructions.
 3.  **Vector Essay:**
-    *   Store the cluster centroids for both Pos and Neg sets. This keeps the `.ceps` file small (you only store 10–20 centroids rather than 1,000 raw embeddings).
-4.  **Storage:** Save as a `.ceps` (compressed JSON or Pickle). Also need to save metadata like "default prompt" (basic role steering).
+    *   Store the cluster centroids for both Pos and Neg sets. This keeps the `.grcs` file small (you only store 10–20 centroids rather than 1,000 raw embeddings).
+4.  **Storage:** Save as a `.grcs` (JSON). Also need to save metadata like "default prompt" (basic role steering).
 
 ---
 
@@ -86,5 +88,5 @@ print(similarities)
 3.  **Contrastive Scoring:**
     *   Embed each of the new $k$ completions.
     *   Calculate similarity to the **Positive Centroids** and **Negative Centroids**.
-    *   `Score = max(Sim_Pos) - (alpha * max(Sim_Neg))` (alpha small first, let say 0.1) (configurable but default inside ceps metadata)
+    *   `Score = max(Sim_Pos) - (alpha * max(Sim_Neg))` (alpha small first, let say 0.1) (configurable but default inside grcs metadata)
 4.  **Selection:** Return the highest-scoring candidate.

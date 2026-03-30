@@ -1,5 +1,5 @@
 """
-CEPS Phase 1: Judge UI
+GRCS Phase 1: Judge UI
 
 A lightweight Flask app that renders generated UI completions in iframes
 and lets a human label each as Positive (P) or Negative (N).
@@ -83,5 +83,5 @@ def api_label():
 
 def run_judge(host: str = "127.0.0.1", port: int = 5000, debug: bool = False):
     """Start the judge UI server."""
-    print(f"[JUDGE] Starting CEPS Judge at http://{host}:{port}")
+    print(f"[JUDGE] Starting GRCS Judge at http://{host}:{port}")
     app.run(host=host, port=port, debug=debug)

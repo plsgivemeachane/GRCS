@@ -1,5 +1,5 @@
 """
-CEPS Phase 1: Generator Module
+GRCS Phase 1: Generator Module
 
 Abstract base class for batch UI generation with pluggable backends.
 Currently implements LM Studio (OpenAI-compatible API).
@@ -17,7 +17,7 @@ from typing import Optional
 import requests
 import lmstudio as lms
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from src.checker import check_answer
+from grcs.checker import check_answer
 
 
 # System prompt logic: Load from file or fallback to hardcoded default
@@ -84,7 +84,7 @@ class LMStudioGenerator(BaseGenerator):
             if attempt > 0:
                 sleep_time = self.backoff_factor ** attempt
                 time.sleep(sleep_time)
-                logging.getLogger("ceps.generator").info(f"Retrying request (attempt {attempt}/{self.retries})...")
+                logging.getLogger("grcs.generator").info(f"Retrying request (attempt {attempt}/{self.retries})...")
             
             try:
                 # The SDK uses a different host format usually (host:port)
@@ -116,13 +116,13 @@ class LMStudioGenerator(BaseGenerator):
                     return response.content
             except Exception as e:
                 last_exception = e
-                logging.getLogger("ceps.generator").error(f"LM Studio SDK request failed (attempt {attempt+1}): {e}")
+                logging.getLogger("grcs.generator").error(f"LM Studio SDK request failed (attempt {attempt+1}): {e}")
         
         raise last_exception or Exception("Unknown error in _make_request via SDK")
 
     def generate(self, prompt: str, k: int = 3, expected_type: str = "html"):
         n_workers = min(k, self.max_workers)
-        logger_gen = logging.getLogger("ceps.generator")
+        logger_gen = logging.getLogger("grcs.generator")
         logger_gen.info(f"[*] Dispatching {k} parallel requests via LM Studio SDK (workers={n_workers})...")
         
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
@@ -177,7 +177,7 @@ class OpenAIGenerator(BaseGenerator):
             if attempt > 0:
                 sleep_time = self.backoff_factor ** attempt
                 time.sleep(sleep_time)
-                logging.getLogger("ceps.generator").info(f"Retrying request (attempt {attempt}/{self.retries})...")
+                logging.getLogger("grcs.generator").info(f"Retrying request (attempt {attempt}/{self.retries})...")
                 
             try:
                 resp = requests.post(
@@ -202,7 +202,7 @@ class OpenAIGenerator(BaseGenerator):
                 return data["choices"][0]["message"]["content"]
             except Exception as e:
                 last_exception = e
-                logging.getLogger("ceps.generator").error(f"Request failed (attempt {attempt+1}): {e}")
+                logging.getLogger("grcs.generator").error(f"Request failed (attempt {attempt+1}): {e}")
         
         raise last_exception or Exception("Unknown error in _make_request")
 

@@ -9,8 +9,8 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 
-from src.utils import chunk_text
-from src.checker import check_answer
+from grcs.utils import chunk_text
+from grcs.checker import check_answer
 
 # Configure logging
 logging.basicConfig(
@@ -18,14 +18,18 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stdout,
 )
-logger = logging.getLogger("ceps.builder")
+logger = logging.getLogger("grcs.builder")
 
-CEPS_VERSION = "1.0"
+GRCS_VERSION = "1.0"
 DEFAULT_EMBEDDING_MODEL = "google/embeddinggemma-300m"
 
 
-class CEPSBuilder:
-    def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL):
+class GRCSBuilder:
+    """
+    Analyzes labeled data and builds a GRCS Map (.grcs).
+    """
+
+    def __init__(self, model_name: str = "google/embedding-gemma-300m"):
         logger.info(f"[*] Loading embedding model: {model_name}")
         try:
             self.model = SentenceTransformer(model_name)
@@ -46,18 +50,23 @@ class CEPSBuilder:
                     samples.append(json.loads(line))
         return samples
 
-    def build_patch(
+    def build(
         self,
-        samples: List[Dict[str, Any]],
-        output_path: str,
+        input_path: str,
+        output_path: str = "maps/v1.grcs",
         n_clusters: int = 50,
         alpha: float = 0.1,
-        default_prompt: str = "",
         expected_type: str = "html",
     ):
         """
-        Builds the CEPS patch (the .ceps file).
+        Builds the GRCS map (the .grcs file).
         """
+        input_path = Path(input_path)
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        samples = self.load_samples(str(input_path))
+        
         # 1. Filter Pos/Neg samples
         pos_samples = [s for s in samples if s.get("label") == "P"]
         neg_samples = [s for s in samples if s.get("label") == "N"]
@@ -73,36 +82,41 @@ class CEPSBuilder:
 
         # 2. Anchor Selection
         anchor_data = self._select_anchor(pos_samples, expected_type=expected_type)
+        anchor_prompt = anchor_data.get("prompt", "")
+        anchor_completion = anchor_data.get("completion", "")
 
         # 3. Clustering (Vector Essay)
         pos_centroids = self._get_centroids([check_answer(s["completion"], expected_type=expected_type) for s in pos_samples], n_clusters)
         neg_centroids = self._get_centroids([check_answer(s["completion"], expected_type=expected_type) for s in neg_samples], n_clusters)
 
         # 4. Metadata & Storage
-        patch = {
+        self.map_data = {
             "metadata": {
-                "ceps_version": CEPS_VERSION,
+                "grcs_version": GRCS_VERSION,
                 "model_name": self.model_name,
-                "created_at": str(np.datetime64('now')),
+                "alpha": alpha,
+                "expected_type": expected_type,
+                "created_at": str(Path(input_path).stat().st_mtime),
             },
             "config": {
                 "alpha": alpha,
-                "default_prompt": default_prompt or pos_samples[0].get("prompt", ""),
-            },
-            "anchor": anchor_data,
-            "essay": {
-                "pos_centroids": pos_centroids,
-                "neg_centroids": neg_centroids,
+                "default_prompt": anchor_prompt,
             },
         }
-
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # 7. Final Map Structure
+        self.map_data["pos_centroids"] = pos_centroids
+        self.map_data["neg_centroids"] = neg_centroids
+        self.map_data["anchor"] = {
+            "prompt": anchor_prompt,
+            "completion": anchor_completion,
+        }
+
+        # 8. Save to JSON
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(patch, f, indent=2)
+            json.dump(self.map_data, f, indent=4)
             
-        logger.info(f"[+] Patch saved successfully to {output_path}")
+        logger.info(f"[*] GRCS map saved to {output_path}")
 
     def _get_centroids(self, texts: List[str], n_clusters: int) -> List[List[float]]:
         """
@@ -170,10 +184,9 @@ class CEPSBuilder:
 
 
 def run_builder(input_path: str, output_path: str, model_name: str, n_clusters: int, alpha: float, expected_type: str = "html"):
-    builder = CEPSBuilder(model_name=model_name)
-    samples = builder.load_samples(input_path)
-    builder.build_patch(
-        samples=samples,
+    builder = GRCSBuilder(model_name=model_name)
+    builder.build(
+        input_path=input_path,
         output_path=output_path,
         n_clusters=n_clusters,
         alpha=alpha,

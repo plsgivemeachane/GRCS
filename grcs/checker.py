@@ -1,7 +1,7 @@
 import re
 import logging
 
-logger = logging.getLogger("ceps.checker")
+logger = logging.getLogger("grcs.checker")
 
 
 def strip_think_tags(content: str) -> str:

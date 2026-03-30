@@ -38,16 +38,8 @@ The system selects the answer that is closest to the positive map and farthest f
 
 ## Quickstart
 
-### Using a Behavior Map
-```python
-import grcs
-
-# Load a model with a behavior map for python coding
-model = grcs.load("llama-3", map_file="./maps/python_logic.grcs")
-
-# The model generates a group of 6 and returns the best completion
-output = model.generate("Create a secure login script")
-```
+### Using GRCS (CLI)
+Currently we only have CLI tools.
 
 ### Building a Behavior Map
 You create a map by showing the system a few examples of completions you liked and completions you didn't.

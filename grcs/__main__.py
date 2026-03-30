@@ -1,5 +1,5 @@
 """
-CEPS v1.0 — CLI Entry Point
+GRCS v1.0 — CLI Entry Point
 
 Usage:
     py main.py generate [--prompts prompts.json] [--k 3] [--output data/samples.jsonl] [--backend lmstudio]
@@ -11,10 +11,10 @@ import json
 import sys
 from pathlib import Path
 
-from src.generator import LMStudioGenerator, OpenAIGenerator, run_generation
-from src.judge_ui import run_judge
-from src.builder import run_builder
-from src.engine import run_engine_inference
+from .generator import LMStudioGenerator, OpenAIGenerator, run_generation
+from .judge_ui import run_judge
+from .builder import run_builder
+from .engine import run_engine_inference
 
 # Default prompt: one imaginary product landing page
 DEFAULT_PROMPTS = [
@@ -80,7 +80,7 @@ def cmd_build(args):
 
 def cmd_run(args):
     run_engine_inference(
-        patch_path=args.patch,
+        map_path=args.map,
         prompt=args.prompt,
         k=args.k,
         alpha=args.alpha,
@@ -94,8 +94,8 @@ def cmd_run(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="ceps",
-        description="CEPS v1.0 — Contrastive Embedding Preference Steering",
+        prog="grcs",
+        description="GRCS v1.0 — Group Relative Completion Selection",
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -136,12 +136,12 @@ def main():
     jud.add_argument("--debug", action="store_true", help="Enable Flask debug mode")
 
     # -- build --
-    bld = sub.add_parser("build", help="Analyze labeled data and build a .ceps patch")
+    bld = sub.add_parser("build", help="Analyze labeled data and build a .grcs map")
     bld.add_argument(
         "--input", type=str, default="data/samples.jsonl", help="Path to labeled data"
     )
     bld.add_argument(
-        "--output", type=str, default="patches/v1.ceps", help="Output .ceps patch path"
+        "--output", type=str, default="maps/v1.grcs", help="Output .grcs map path"
     )
     bld.add_argument(
         "--k", type=int, default=10, help="Maximum number of centroids to store"
@@ -160,9 +160,9 @@ def main():
     )
 
     # -- run --
-    run = sub.add_parser("run", help="Run steered inference using a CEPS patch")
+    run = sub.add_parser("run", help="Run steered inference using a GRCS map")
     run.add_argument(
-        "--patch", type=str, default="patches/v1.ceps", help="Path to CEPS patch"
+        "--map", type=str, default="maps/v1.grcs", help="Path to GRCS map"
     )
     run.add_argument(
         "--prompt", type=str, required=True, help="User prompt to generate UI"
