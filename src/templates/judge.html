@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>CEPS Judge | Production</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+  <style>
+    @theme {
+      --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    
+    html, body { height: 100vh; overflow: hidden; }
+    
+    /* Better Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fadeIn 0.3s ease-out forwards; }
+    
+    #loading-overlay {
+      transition: opacity 0.4s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-[#0b0d12] text-slate-200 font-sans flex flex-col items-stretch">
+
+  <!-- Loading State -->
+  <div id="loading-overlay" class="fixed inset-0 z-[1000] bg-[#0b0d12] flex flex-col items-center justify-center pointer-events-none opacity-0">
+    <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+    <p class="mt-4 text-sm font-medium text-slate-400 tracking-wider">LOADING DATA</p>
+  </div>
+
+  <!-- Header -->
+  <header class="h-16 flex items-center justify-between px-8 bg-[#12141c]/80 backdrop-blur-xl border-b border-slate-800/50 z-50 shrink-0">
+    <div class="flex items-center gap-8">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <span class="text-white font-bold text-lg">C</span>
+        </div>
+        <h1 class="text-lg font-bold tracking-tight text-white">CEPS<span class="text-indigo-400 ml-1">Judge</span></h1>
+      </div>
+
+      <div class="relative group">
+        <select id="file-select" class="appearance-none bg-[#1a1d2e] hover:bg-[#23273a] border border-slate-700/50 rounded-lg px-4 py-2 pr-10 text-xs font-semibold text-slate-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 min-w-[240px]" onchange="loadSamples()">
+          <!-- Files populated here -->
+        </select>
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-6">
+      <div class="flex gap-4">
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Progress</div>
+          <div class="text-sm font-mono font-medium text-indigo-300" id="stat-progress">0/0</div>
+        </div>
+        <div class="w-[1px] h-8 bg-slate-800 self-center"></div>
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Labeled</div>
+          <div class="text-sm font-mono font-medium text-emerald-400" id="stat-labeled">0</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Prompt Context Bar -->
+  <div id="info-bar" class="h-12 flex items-center px-8 bg-[#0f111a] border-b border-slate-800/40 shrink-0 overflow-hidden" style="display: none;">
+    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest shrink-0 mr-4">Source Prompt</span>
+    <p id="prompt-text" class="text-xs font-mono text-slate-400 truncate"></p>
+  </div>
+
+  <!-- Viewport Area -->
+  <main class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+    <!-- Empty State -->
+    <div id="no-content" class="flex flex-col items-center justify-center gap-6 text-slate-500 max-w-md text-center p-8">
+      <div class="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-3xl">🧩</div>
+      <div>
+        <h3 class="text-white font-semibold mb-1">No Active Dataset</h3>
+        <p class="text-xs leading-relaxed">Select a JSONL file from the dropdown to begin labeling completions.</p>
+      </div>
+    </div>
+
+    <!-- Active Content -->
+    <div id="iframe-container" class="absolute inset-0 hidden">
+      <!-- Iframe injected here -->
+    </div>
+  </main>
+
+  <!-- Control Bar -->
+  <footer id="toolbar" class="bg-[#12141c] border-t border-slate-800 p-6 px-8 flex items-center gap-4 z-50 shrink-0" style="display: none;">
+    <div class="flex items-center gap-3">
+      <button 
+        id="btn-p" 
+        onclick="labelSample('P')"
+        class="group relative h-12 px-8 rounded-xl font-bold text-sm flex items-center gap-3 transition-all active:scale-95 bg-emerald-950/30 text-emerald-400 border border-emerald-800/30 hover:bg-emerald-500 hover:text-white hover:border-emerald-500"
+      >
+        <div class="w-6 h-6 rounded-md bg-emerald-900/50 flex items-center justify-center text-[10px] group-hover:bg-white/20">P</div>
+        POSITIVE
+      </button>
+
+      <button 
+        id="btn-n" 
+        onclick="labelSample('N')"
+        class="group relative h-12 px-8 rounded-xl font-bold text-sm flex items-center gap-3 transition-all active:scale-95 bg-red-950/30 text-red-400 border border-red-800/30 hover:bg-red-500 hover:text-white hover:border-red-500"
+      >
+        <div class="w-6 h-6 rounded-md bg-red-900/50 flex items-center justify-center text-[10px] group-hover:bg-white/20">N</div>
+        NEGATIVE
+      </button>
+
+      <button 
+        onclick="labelSample(null)"
+        class="h-12 px-6 rounded-xl font-bold text-xs text-slate-500 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-slate-300 transition-all active:scale-95 flex items-center gap-2"
+      >
+        <span class="inline-block w-5 h-5 bg-slate-950 rounded flex items-center justify-center text-[9px]">S</span>
+        SKIP
+      </button>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 px-4 py-2 bg-slate-900/50 rounded-lg text-[10px] text-slate-500 font-mono tracking-tighter">
+        <span class="text-indigo-400">SHORTCUTS:</span> 
+        <span>A/Left (Prev)</span>
+        <span class="mx-1">•</span>
+        <span>D/Right (Next)</span>
+      </div>
+      
+      <button 
+        id="btn-next" 
+        onclick="nextSample()"
+        class="h-12 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:pointer-events-none text-white font-bold text-sm shadow-lg shadow-indigo-600/20 flex items-center gap-3 transition-all active:scale-95"
+      >
+        NEXT SAMPLE
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    let samples = [];
+    let idx = 0;
+    let isSaving = false;
+
+    // --- Core Interaction ---
+
+    async function api(url, options = {}) {
+      try {
+        const resp = await fetch(url, options);
+        if (!resp.ok) throw new Error(`Status ${resp.status}`);
+        return await resp.json();
+      } catch (err) {
+        console.error("[API Error]", err);
+        return null;
+      }
+    }
+
+    async function loadSamples() {
+      const file = document.getElementById('file-select').value;
+      if (!file) return;
+
+      loader(true);
+      const data = await api(`/api/samples?file=${file}`);
+      samples = data || [];
+      idx = 0;
+
+      // Find first unlabeled to save time
+      const first = samples.findIndex(s => s.label === null);
+      if (first !== -1) idx = first;
+
+      render();
+      loader(false);
+    }
+
+    async function labelSample(label) {
+      if (isSaving || !samples[idx]) return;
+      const s = samples[idx];
+      const file = document.getElementById('file-select').value;
+
+      isSaving = true;
+      const res = await api('/api/label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file, id: s.id, label }),
+      });
+
+      if (res && res.ok) {
+        s.label = label;
+        updateStats();
+        
+        // Visual feedback then move next
+        setTimeout(() => {
+          if (idx < samples.length - 1) nextSample();
+          else render();
+          isSaving = false;
+        }, 120);
+      } else {
+        isSaving = false;
+      }
+    }
+
+    function nextSample() {
+      if (idx < samples.length - 1) {
+        idx++;
+        render();
+      }
+    }
+
+    function render() {
+      const container = document.getElementById('iframe-container');
+      const noContent = document.getElementById('no-content');
+      const toolbar = document.getElementById('toolbar');
+      const info = document.getElementById('info-bar');
+      const prompt = document.getElementById('prompt-text');
+      
+      updateStats();
+
+      if (samples.length === 0) {
+        container.classList.add('hidden');
+        noContent.classList.remove('hidden');
+        toolbar.style.display = 'none';
+        info.style.display = 'none';
+        return;
+      }
+
+      const s = samples[idx];
+      noContent.classList.add('hidden');
+      container.classList.remove('hidden');
+      toolbar.style.display = 'flex';
+      info.style.display = 'flex';
+      prompt.textContent = s.prompt || "...";
+
+      // Rebuild iframe to avoid srcdoc parsing issues from innerHTML
+      container.innerHTML = '';
+      const ifr = document.createElement('iframe');
+      ifr.className = "w-full h-full bg-white border-none animate-in";
+      // Set srcdoc directly to avoid string parsing issues
+      ifr.srcdoc = s.completion || "<html><body><p>No completion found.</p></body></html>";
+      container.appendChild(ifr);
+
+      // Button state
+      const pBtn = document.getElementById('btn-p');
+      const nBtn = document.getElementById('btn-n');
+      
+      const activeClass = "ring-4 ring-offset-2 ring-offset-[#12141c]";
+      pBtn.classList.toggle('ring-4', s.label === 'P');
+      pBtn.classList.toggle('ring-emerald-500/50', s.label === 'P');
+      nBtn.classList.toggle('ring-4', s.label === 'N');
+      nBtn.classList.toggle('ring-red-500/50', s.label === 'N');
+    }
+
+    function updateStats() {
+      const labeled = samples.filter(s => s.label !== null).length;
+      document.getElementById('stat-progress').textContent = samples.length ? `${idx + 1} / ${samples.length}` : '0 / 0';
+      document.getElementById('stat-labeled').textContent = labeled;
+      document.getElementById('btn-next').disabled = idx >= samples.length - 1;
+    }
+
+    function loader(show) {
+      const el = document.getElementById('loading-overlay');
+      el.style.opacity = show ? '1' : '0';
+    }
+
+    // Initialize
+    async function init() {
+      loader(true);
+      const files = await api('/api/files');
+      const sel = document.getElementById('file-select');
+      
+      if (!files || !files.length) {
+        sel.innerHTML = '<option value="">(No JSONL files found)</option>';
+        loader(false);
+        render();
+        return;
+      }
+
+      sel.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
+      await loadSamples();
+      loader(false);
+    }
+
+    // Keyboard controls
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'SELECT') return;
+      
+      const k = e.key.toLowerCase();
+      if (k === 'p' || k === '1') labelSample('P');
+      else if (k === 'n' || k === '2') labelSample('N');
+      else if (k === 's' || k === '0') labelSample(null);
+      else if (k === 'arrowright' || k === 'd' || k === ' ') {
+        e.preventDefault();
+        nextSample();
+      } else if (k === 'arrowleft' || k === 'a') {
+        if (idx > 0) { idx--; render(); }
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
