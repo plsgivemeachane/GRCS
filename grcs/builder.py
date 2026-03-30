@@ -105,11 +105,13 @@ class GRCSBuilder:
         }
         
         # 7. Final Map Structure
-        self.map_data["pos_centroids"] = pos_centroids
-        self.map_data["neg_centroids"] = neg_centroids
         self.map_data["anchor"] = {
             "prompt": anchor_prompt,
             "completion": anchor_completion,
+        }
+        self.map_data["essay"] = {
+            "pos_centroids": pos_centroids,
+            "neg_centroids": neg_centroids,
         }
 
         # 8. Save to JSON

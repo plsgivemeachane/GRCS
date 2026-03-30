@@ -36,16 +36,37 @@ The system selects the answer that is closest to the positive map and farthest f
 | **Portability** | Text Snippets | Large Weight Files | **Small Map Files** |
 | **Success Rate** | Variable | High | **High (Verified Top Pick)** |
 
-## Quickstart
+## Quickstart (CLI Only)
 
-### Using GRCS (CLI)
-Currently we only have CLI tools.
-
-### Building a Behavior Map
-You create a map by showing the system a few examples of completions you liked and completions you didn't.
-
+### 1. Installation
+Install the dependencies:
 ```bash
-python -m grcs.build --data ./my_past_tasks.jsonl --output ./logic_expert.grcs
+pip install -r requirements.txt
+```
+
+### 2. Generate Candidate Data
+Generate multiple completions for labeling:
+```bash
+python -m grcs generate --k 3 --output data/samples.jsonl
+```
+
+### 3. Label with Judge UI
+Run the local labeling tool to mark completions as Positive (P) or Negative (N):
+```bash
+python -m grcs judge
+```
+
+### 4. Build the Behavior Map
+Analyze your labels and build a `.grcs` map file:
+```bash
+python -m grcs build --input data/samples.jsonl --output maps/v1.grcs
+```
+(Alternatively: `python -m grcs.build --data ./data/samples.jsonl --output ./maps/v1.grcs`)
+
+### 5. Run Steered Inference
+Run the engine to select the best answer using your behavior map:
+```bash
+python -m grcs run --map maps/v1.grcs --prompt "Build a dark theme hero section" --k 3
 ```
 
 ## The Compute Trade-off

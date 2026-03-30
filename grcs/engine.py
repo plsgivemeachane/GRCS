@@ -34,19 +34,33 @@ class GRCSEngine:
         with open(self.map_path, "r", encoding="utf-8") as f:
             self.map_data = json.load(f)
 
-        self.grcs_version = self.map_data["metadata"]["grcs_version"]
-        self.model_name = model_name or self.map_data["metadata"]["model_name"]
-        self.alpha = self.map_data["metadata"].get("alpha", 0.1)
+        self.grcs_version = self.map_data["metadata"].get("grcs_version", "1.0")
+        self.model_name = model_name or self.map_data["metadata"].get("model_name")
+        
+        # Robust Alpha Loading
+        self.alpha = self.map_data["metadata"].get("alpha")
+        if self.alpha is None:
+            self.alpha = self.map_data.get("config", {}).get("alpha", 0.1)
+
         self.expected_type = self.map_data["metadata"].get("expected_type", "html")
-        self.anchor = check_answer(self.map_data["anchor"]["completion"])
+        
+        # Robust Anchor Loading
+        anchor_data = self.map_data.get("anchor", {})
+        self.anchor = check_answer(anchor_data.get("completion", ""))
 
         logger.info(f"[*] Initializing GRCS v{self.grcs_version} Engine")
         logger.info(f"[*] Loading embedding model: {self.model_name}")
         self.embedder = SentenceTransformer(self.model_name)
 
-        # Load centroids as numpy arrays
-        self.pos_centroids = np.array(self.map_data["pos_centroids"])
-        self.neg_centroids = np.array(self.map_data["neg_centroids"])
+        # Load centroids as numpy arrays (Support for both root-level and "essay" key)
+        if "essay" in self.map_data:
+            self.pos_centroids = np.array(self.map_data["essay"]["pos_centroids"])
+            self.neg_centroids = np.array(self.map_data["essay"]["neg_centroids"])
+        elif "pos_centroids" in self.map_data:
+            self.pos_centroids = np.array(self.map_data["pos_centroids"])
+            self.neg_centroids = np.array(self.map_data["neg_centroids"])
+        else:
+            raise KeyError("Neither 'essay' nor 'pos_centroids' key found in GRCS map.")
 
     def get_steered_prompt(self) -> str:
         """
